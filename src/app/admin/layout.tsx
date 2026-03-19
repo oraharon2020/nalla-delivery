@@ -32,6 +32,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { href: '/admin/reports', label: 'דוחות', icon: '📈' },
     { href: '/admin/tracking', label: 'מעקב נהגים', icon: '📍' },
     { href: '/admin/documents', label: 'תעודות חתומות', icon: '📝' },
+    { href: '/admin/push', label: 'התראות Push', icon: '📢' },
     { href: '/admin/admins', label: 'ניהול מנהלים', icon: '🔑' },
     { href: '/admin/settings', label: 'הגדרות', icon: '⚙️' },
   ];

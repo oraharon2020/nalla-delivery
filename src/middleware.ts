@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server';
 const publicPaths = ['/login', '/admin/login', '/api'];
 
 // נתיבים של assets שלא צריכים בדיקה
-const assetPaths = ['/_next', '/assets', '/favicon.ico', '/manifest.json'];
+const assetPaths = ['/_next', '/assets', '/favicon.ico', '/manifest.json', '/sw.js'];
 
 // נתיבי אדמין שדורשים אימות אדמין (מטופלים בצד הלקוח)
 const adminPaths = ['/admin'];
