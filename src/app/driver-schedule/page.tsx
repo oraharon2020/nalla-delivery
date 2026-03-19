@@ -7,6 +7,7 @@ import { useLoader } from '@/components/ui/Loader';
 import { getDeliveries } from '@/utils/api';
 import { formatDateForInput, getCurrentUsername, isAuthenticated, getStatusLabel } from '@/utils/helpers';
 import { useGpsTracker } from '@/hooks/useGpsTracker';
+import PullToRefresh from '@/components/ui/PullToRefresh';
 import type { Delivery } from '@/types';
 
 export default function DriverSchedulePage() {
@@ -78,6 +79,7 @@ export default function DriverSchedulePage() {
   };
 
   return (
+    <PullToRefresh onRefresh={loadSchedule}>
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
@@ -223,5 +225,6 @@ export default function DriverSchedulePage() {
         </div>
       </main>
     </div>
+    </PullToRefresh>
   );
 }

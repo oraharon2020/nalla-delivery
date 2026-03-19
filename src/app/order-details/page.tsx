@@ -15,6 +15,7 @@ import {
 } from '@/utils/helpers';
 import type { WCOrder, AllowedStatuses, UploadedFile } from '@/types';
 import { supabase } from '@/lib/supabase';
+import PullToRefresh from '@/components/ui/PullToRefresh';
 
 export default function OrderDetailsPage() {
   return (
@@ -446,6 +447,7 @@ function OrderDetailsContent() {
   const customerName = `${order.billing.first_name} ${order.billing.last_name}`;
 
   return (
+    <PullToRefresh onRefresh={() => loadOrderDetails(orderId, storeId)}>
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
@@ -699,5 +701,6 @@ function OrderDetailsContent() {
         </div>
       </main>
     </div>
+    </PullToRefresh>
   );
 }
