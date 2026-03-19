@@ -6,15 +6,11 @@ import { Navbar } from '@/components/layout/Navbar';
 import { useLoader } from '@/components/ui/Loader';
 import { getDeliveries } from '@/utils/api';
 import { formatDateForInput, getCurrentUsername, isAuthenticated, getStatusLabel } from '@/utils/helpers';
-import { useGpsTracker } from '@/hooks/useGpsTracker';
 import PullToRefresh from '@/components/ui/PullToRefresh';
 import type { Delivery } from '@/types';
 
 export default function DriverSchedulePage() {
   const router = useRouter();
-  
-  // Start GPS tracking
-  useGpsTracker();
   const { show: showLoader, hide: hideLoader } = useLoader();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [selectedDate, setSelectedDate] = useState('');

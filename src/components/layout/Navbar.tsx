@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { clearAuthData, getCurrentUsername } from '@/utils/helpers';
 import { registerPushSubscription, isPushSubscribed } from '@/lib/push';
+import { useGpsTracker } from '@/hooks/useGpsTracker';
 
 // PWA install prompt type
 interface BeforeInstallPromptEvent extends Event {
@@ -19,6 +20,9 @@ export function Navbar() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [pushEnabled, setPushEnabled] = useState<boolean | null>(null);
   const router = useRouter();
+
+  // GPS tracking - broadcasts location from any page
+  useGpsTracker();
 
   useEffect(() => {
     setUsername(getCurrentUsername());
