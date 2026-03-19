@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { registerPushSubscription } from '@/lib/push';
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
@@ -42,9 +41,6 @@ export default function AdminLoginPage() {
 
       localStorage.setItem('adminToken', data.token);
       localStorage.setItem('adminUser', JSON.stringify(data.user));
-      
-      // Register for push notifications
-      registerPushSubscription(data.user?.email || 'admin', 'admin');
       
       router.push('/admin');
     } catch (err: any) {

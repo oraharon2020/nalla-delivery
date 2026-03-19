@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nalla-driver-v1';
+const CACHE_NAME = 'nalla-driver-v2';
 const STATIC_ASSETS = [
   '/login',
   '/driver-schedule',
@@ -57,15 +57,11 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: '/assets/logo.png',
-    badge: '/assets/logo.png',
-    vibrate: [200, 100, 200],
+    icon: '/assets/icon-192.png',
+    badge: '/assets/icon-192.png',
     dir: 'rtl',
     lang: 'he',
     data: { url: data.url || '/' },
-    actions: [
-      { action: 'open', title: 'פתח' },
-    ],
   };
 
   event.waitUntil(

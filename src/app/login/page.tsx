@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { login } from '@/utils/api';
 import { setAuthData, isAuthenticated } from '@/utils/helpers';
-import { registerPushSubscription } from '@/lib/push';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,9 +65,6 @@ export default function LoginPage() {
 
         // Save auth data
         setAuthData(response.token, response.username);
-
-        // Register for push notifications
-        registerPushSubscription(response.username, 'driver');
 
         // Redirect to dashboard
         router.push('/driver-schedule');

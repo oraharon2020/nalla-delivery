@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { clearAuthData, getCurrentUsername } from '@/utils/helpers';
+import { registerPushSubscription, isPushSubscribed } from '@/lib/push';
 
 // PWA install prompt type
 interface BeforeInstallPromptEvent extends Event {
@@ -16,6 +17,7 @@ export function Navbar() {
   const [username, setUsername] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,6 +36,16 @@ export function Navbar() {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+
+  // Check push subscription status
+  useEffect(() => {
+    isPushSubscribed().then(setPushEnabled);
+  }, []);
+
+  const handleEnablePush = async () => {
+    const result = await registerPushSubscription(getCurrentUsername(), 'driver');
+    setPushEnabled(result);
+  };
 
   const handleLogout = () => {
     clearAuthData();
@@ -104,7 +116,29 @@ export function Navbar() {
               </button>
               <img src="/assets/logo.png" alt="Logo" className="h-8" />
             </div>
-            <div className="text-gray-600">שלום {username}</div>
+            <div className="flex items-center gap-3">
+              {/* Push notification bell */}
+              {pushEnabled === false && (
+                <button
+                  onClick={handleEnablePush}
+                  className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="הפעל התראות"
+                >
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                </button>
+              )}
+              {pushEnabled === true && (
+                <span className="p-2 text-green-500" title="התראות פעילות">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                  </svg>
+                </span>
+              )}
+              <div className="text-gray-600">שלום {username}</div>
+            </div>
           </div>
         </div>
       </nav>
