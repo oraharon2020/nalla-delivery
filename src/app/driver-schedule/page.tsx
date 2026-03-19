@@ -4,22 +4,28 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
 import { useLoader } from '@/components/ui/Loader';
-import { getDeliveries, getOrder } from '@/utils/api';
-import { formatDateForInput, getCurrentUsername, isAuthenticated } from '@/utils/helpers';
+import { getDeliveries } from '@/utils/api';
+import { formatDateForInput, getCurrentUsername, isAuthenticated, getStatusLabel } from '@/utils/helpers';
+import { useGpsTracker } from '@/hooks/useGpsTracker';
 import type { Delivery } from '@/types';
 
 export default function DriverSchedulePage() {
   const router = useRouter();
+  
+  // Start GPS tracking
+  useGpsTracker();
   const { show: showLoader, hide: hideLoader } = useLoader();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [username, setUsername] = useState('');
 
   // Set initial date on client side only
   useEffect(() => {
     setIsClient(true);
     setSelectedDate(formatDateForInput());
+    setUsername(getCurrentUsername());
   }, []);
 
   useEffect(() => {
@@ -43,36 +49,7 @@ export default function DriverSchedulePage() {
       const response = await getDeliveries(selectedDate);
 
       if (response.success && response.data) {
-        // Fetch WooCommerce status for each delivery
-        const deliveriesWithStatus = await Promise.all(
-          response.data.map(async (delivery) => {
-            try {
-              const orderId = delivery.order_id.toString();
-              let storeId = '1';
-
-              if (orderId.startsWith('3') || orderId.startsWith('4')) {
-                storeId = '2';
-              }
-
-              const wcResponse = await getOrder(delivery.order_id, storeId);
-
-              if (
-                wcResponse.success &&
-                wcResponse.data?.status?.includes('done')
-              ) {
-                delivery.status = wcResponse.data.status;
-              }
-            } catch (e) {
-              console.error(
-                `Error fetching WC status for order ${delivery.order_id}:`,
-                e
-              );
-            }
-            return delivery;
-          })
-        );
-
-        setDeliveries(deliveriesWithStatus);
+        setDeliveries(response.data);
       } else {
         throw new Error(response.message || 'שגיאה בטעינת המשלוחים');
       }
@@ -84,13 +61,13 @@ export default function DriverSchedulePage() {
     }
   };
 
-  const getStatusDisplay = (status: string) => {
+  const getStatusDisplay = (status: string, completedAt?: string | null) => {
     const statusLower = status?.toLowerCase() || '';
 
-    if (statusLower.includes('done')) {
-      return { text: status, className: 'status-completed' };
-    } else if (statusLower === 'completed') {
-      return { text: 'תואם אספקה', className: 'status-completed' };
+    if (statusLower.includes('done') || completedAt) {
+      return { text: getStatusLabel(status), className: 'status-completed' };
+    } else if (statusLower === 'cancelled') {
+      return { text: 'בוטל', className: 'status-cancelled' };
     }
 
     return { text: 'בהמתנה לתיאום', className: 'status-pending' };
@@ -112,7 +89,7 @@ export default function DriverSchedulePage() {
                 יומן משלוחים
               </h1>
               <div className="text-sm sm:text-lg text-gray-600">
-                שלום {getCurrentUsername()}
+                שלום {username}
               </div>
             </div>
 
@@ -182,7 +159,7 @@ export default function DriverSchedulePage() {
                     </tr>
                   ) : (
                     deliveries.map((delivery, index) => {
-                      const statusDisplay = getStatusDisplay(delivery.status);
+                      const statusDisplay = getStatusDisplay(delivery.status, delivery.completed_at);
                       return (
                         <tr
                           key={delivery.id}

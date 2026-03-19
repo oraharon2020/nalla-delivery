@@ -5,13 +5,34 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { clearAuthData, getCurrentUsername } from '@/utils/helpers';
 
+// PWA install prompt type
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [username, setUsername] = useState('');
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setUsername(getCurrentUsername());
+
+    // Capture the install prompt
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+      // Show banner if not already installed
+      if (!window.matchMedia('(display-mode: standalone)').matches) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const handleLogout = () => {
@@ -19,11 +40,45 @@ export function Navbar() {
     router.push('/login');
   };
 
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+      setShowInstallBanner(false);
+      setInstallPrompt(null);
+    }
+  };
+
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
 
   return (
     <>
+      {/* Install App Banner */}
+      {showInstallBanner && (
+        <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📲</span>
+            <span className="text-sm font-medium">התקן את האפליקציה לגישה מהירה</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleInstall}
+              className="bg-white text-blue-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-blue-50 transition-colors"
+            >
+              התקן
+            </button>
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              className="text-blue-200 hover:text-white px-2"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation Bar */}
       <nav className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

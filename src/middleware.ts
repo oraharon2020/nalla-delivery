@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // נתיבים שלא דורשים אימות
-const publicPaths = ['/login', '/api'];
+const publicPaths = ['/login', '/admin/login', '/api'];
 
 // נתיבים של assets שלא צריכים בדיקה
 const assetPaths = ['/_next', '/assets', '/favicon.ico', '/manifest.json'];
+
+// נתיבי אדמין שדורשים אימות אדמין (מטופלים בצד הלקוח)
+const adminPaths = ['/admin'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,8 +22,13 @@ export function middleware(request: NextRequest) {
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
+
+  // נתיבי אדמין - האימות מתבצע בצד הלקוח
+  if (adminPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
   
-  // בדוק אם יש טוקן
+  // בדוק אם יש טוקן (לנהגים)
   const token = request.cookies.get('auth_token')?.value;
   
   if (!token) {

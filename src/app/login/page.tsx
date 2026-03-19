@@ -103,7 +103,7 @@ export default function LoginPage() {
               htmlFor="username"
               className="block text-sm font-medium text-gray-700"
             >
-              שם משתמש
+              אימייל / שם
             </label>
             <div className="mt-1">
               <input
@@ -113,6 +113,7 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                placeholder="אימייל או שם משתמש"
                 className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
               />
             </div>

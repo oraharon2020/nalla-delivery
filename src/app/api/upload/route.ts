@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { uploadToGoogleDrive } from '@/lib/google-drive';
+import { logActivity } from '@/lib/activity-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,14 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Log file upload activity
+    await logActivity({
+      driverId: user.user_id,
+      driverName: user.username,
+      action: 'file_uploaded',
+      details: { file_name: file.name, file_type: file.type },
+    });
 
     return NextResponse.json({
       success: true,

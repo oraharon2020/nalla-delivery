@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { Delivery } from '@/types';
 
 export const dynamic = 'force-dynamic';
-
-const PROXY_URL = 'https://driver.nalla.co.il/api-proxy.php';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,33 +26,39 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Call the PHP proxy API
-    const proxyResponse = await fetch(
-      `${PROXY_URL}?action=get_deliveries&date=${date}&user_id=${user.user_id}`
-    );
-    
-    const proxyData = await proxyResponse.json();
-    
-    if (!proxyData.success) {
+    // Read directly from Supabase delivery_assignments
+    const { data: assignments, error } = await supabase
+      .from('delivery_assignments')
+      .select('*')
+      .eq('driver_id', user.user_id)
+      .eq('delivery_date', date)
+      .order('sequence');
+
+    if (error) {
+      console.error('Supabase query error:', error);
       return NextResponse.json(
-        { success: false, message: proxyData.message || 'שגיאה בטעינת המשלוחים' },
+        { success: false, message: 'שגיאה בטעינת המשלוחים' },
         { status: 500 }
       );
     }
 
-    const deliveries: Delivery[] = (proxyData.data || []).map((row: Record<string, unknown>) => ({
-      id: row.id as number,
-      order_id: row.order_id as string,
-      store_id: row.store_id as string,
-      store_name: (row.store_name as string) || 'לא ידוע',
-      order_number: (row.order_number as string) || (row.order_id as string),
-      shipping_address: (row.shipping_address as string) || 'לא זמין',
-      phone: (row.phone as string) || 'לא זמין',
-      time_slot: (row.time_slot as string) || 'לא נקבע',
-      customer_name: (row.customer_name as string) || 'לא זמין',
-      status: (row.status as string) || 'pending',
-      total_items: (row.total_items as number) || 0,
-      products: row.products ? JSON.parse(row.products as string) : [],
+    const deliveries: Delivery[] = (assignments || []).map((row: any) => ({
+      id: row.id,
+      order_id: String(row.order_id),
+      store_id: row.store_id || '1',
+      store_name: row.store_name || 'לא ידוע',
+      order_number: row.order_number || String(row.order_id),
+      shipping_address: row.shipping_address || 'לא זמין',
+      phone: row.phone || 'לא זמין',
+      time_slot: row.time_slot || 'לא נקבע',
+      customer_name: row.customer_name || 'לא זמין',
+      status: row.status || 'pending',
+      total_items: row.total_items || 0,
+      products: typeof row.products === 'string' ? JSON.parse(row.products) : (row.products || []),
+      notes: row.notes || '',
+      delivery_cost: row.delivery_cost || 0,
+      service_type: row.service_type || 'delivery',
+      completed_at: row.completed_at || null,
     }));
 
     return NextResponse.json({

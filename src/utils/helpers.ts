@@ -25,16 +25,20 @@ export function formatDateForInput(date: Date = new Date()): string {
 
 // Get current username from token
 export function getCurrentUsername(): string {
-  if (typeof window === 'undefined') return 'משתמש לא ידוע';
+  if (typeof window === 'undefined') return '';
 
   try {
     const token = localStorage.getItem('token');
-    if (!token) return 'משתמש לא ידוע';
+    if (!token) return '';
 
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.username || 'משתמש לא ידוע';
+    const base64 = token.split('.')[1];
+    const decoded = new TextDecoder().decode(
+      Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    );
+    const payload = JSON.parse(decoded);
+    return payload.username || '';
   } catch {
-    return 'משתמש לא ידוע';
+    return '';
   }
 }
 
@@ -130,8 +134,8 @@ export function clearAuthData(): void {
   document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 }
 
-// Detect store from order ID
-export function detectStoreFromOrderId(orderId: string): '1' | '2' {
+// Detect store from order ID (legacy fallback)
+export function detectStoreFromOrderId(orderId: string): string {
   if (/^[34]/.test(orderId)) {
     return '2';
   }

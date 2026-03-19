@@ -59,7 +59,7 @@ export interface WCNote {
 
 // Delivery Types
 export interface Delivery {
-  id: number;
+  id: string;
   order_id: string;
   store_id: string;
   store_name: string;
@@ -71,6 +71,10 @@ export interface Delivery {
   status: string;
   total_items: number;
   products: DeliveryProduct[];
+  notes?: string;
+  delivery_cost?: number;
+  service_type?: string;
+  completed_at?: string | null;
 }
 
 export interface DeliveryProduct {
@@ -86,7 +90,7 @@ export interface User {
 }
 
 export interface JWTPayload {
-  user_id: number;
+  user_id: string;
   username: string;
   exp: number;
 }

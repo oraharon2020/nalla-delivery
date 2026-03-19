@@ -50,31 +50,40 @@ export async function GET(request: NextRequest) {
       const api1 = createWooCommerceAPI('1');
       const api2 = createWooCommerceAPI('2');
 
-      let store1Statuses: string[] = [];
-      let store2Statuses: string[] = [];
+      let store1Statuses: Array<{ slug: string; name: string }> = [];
+      let store2Statuses: Array<{ slug: string; name: string }> = [];
 
       try {
         const result1 = await api1.getOrderStatuses();
-        store1Statuses = result1.map((s) => s.slug.replace('wc-', ''));
+        store1Statuses = result1.map((s) => ({ slug: s.slug.replace('wc-', ''), name: s.name }));
       } catch (e) {
         console.error('Error fetching store 1 statuses:', e);
       }
 
       try {
         const result2 = await api2.getOrderStatuses();
-        store2Statuses = result2.map((s) => s.slug.replace('wc-', ''));
+        store2Statuses = result2.map((s) => ({ slug: s.slug.replace('wc-', ''), name: s.name }));
       } catch (e) {
         console.error('Error fetching store 2 statuses:', e);
       }
 
-      // Merge with custom statuses
-      const bellanoStatuses = [...new Set([...store1Statuses, ...customStatuses['1']])];
-      const nallaStatuses = [...new Set([...store2Statuses, ...customStatuses['2']])];
+      // Build label map from WooCommerce responses
+      const labelMap: Record<string, string> = {};
+      [...store1Statuses, ...store2Statuses].forEach(s => {
+        if (s.name) labelMap[s.slug] = s.name;
+      });
+
+      // Merge slugs with custom statuses
+      const store1Slugs = store1Statuses.map(s => s.slug);
+      const store2Slugs = store2Statuses.map(s => s.slug);
+      const bellanoStatuses = [...new Set([...store1Slugs, ...customStatuses['1']])];
+      const nallaStatuses = [...new Set([...store2Slugs, ...customStatuses['2']])];
 
       return NextResponse.json({
         success: true,
         bellano: bellanoStatuses,
         nalla: nallaStatuses,
+        labels: labelMap,
       });
     }
 
@@ -82,12 +91,19 @@ export async function GET(request: NextRequest) {
       const api = createWooCommerceAPI(storeId);
       const result = await api.getOrderStatuses();
 
-      const apiStatuses = result.map((s) => s.slug.replace('wc-', ''));
-      const allStatuses = [...new Set([...apiStatuses, ...customStatuses[storeId]])];
+      const apiStatuses = result.map((s) => ({ slug: s.slug.replace('wc-', ''), name: s.name }));
+      const allSlugs = [...new Set([...apiStatuses.map(s => s.slug), ...customStatuses[storeId]])];
+
+      // Build label map
+      const labelMap: Record<string, string> = {};
+      apiStatuses.forEach(s => {
+        if (s.name) labelMap[s.slug] = s.name;
+      });
 
       return NextResponse.json({
         success: true,
-        data: allStatuses,
+        data: allSlugs,
+        labels: labelMap,
       });
     }
 

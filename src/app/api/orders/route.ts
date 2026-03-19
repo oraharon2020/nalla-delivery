@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { createWooCommerceAPI } from '@/lib/woocommerce';
-import { detectStoreId, StoreId } from '@/lib/config';
+import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activity-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,20 +18,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('order_id');
-    let storeId = searchParams.get('store_id') as StoreId | null;
+    const storeId = searchParams.get('store_id');
 
-    if (!orderId) {
+    if (!orderId || !storeId) {
       return NextResponse.json(
-        { success: false, message: 'מזהה הזמנה נדרש' },
+        { success: false, message: 'מזהה הזמנה ומזהה חנות נדרשים' },
         { status: 400 }
       );
     }
 
-    // Auto-detect store if not provided
-    if (!storeId || !['1', '2'].includes(storeId)) {
-      storeId = detectStoreId(orderId);
-    }
-
+    console.log(`[Orders API] GET order_id=${orderId}, store_id=${storeId}`);
     const api = createWooCommerceAPI(storeId);
     const order = await api.getOrderWithNotes(orderId);
 
@@ -40,7 +37,6 @@ export async function GET(request: NextRequest) {
         ...order,
         store_info: {
           id: storeId,
-          name: storeId === '1' ? 'בלאנו רהיטים' : 'נלה',
         },
       },
     });
@@ -67,20 +63,41 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { order_id, store_id, status } = body;
 
-    if (!order_id || !status) {
+    if (!order_id || !status || !store_id) {
       return NextResponse.json(
         { success: false, message: 'שדות חסרים' },
         { status: 400 }
       );
     }
 
-    let finalStoreId = store_id as StoreId;
-    if (!finalStoreId || !['1', '2'].includes(finalStoreId)) {
-      finalStoreId = detectStoreId(order_id);
+    const api = createWooCommerceAPI(store_id);
+    const order = await api.updateOrderStatus(order_id, status);
+
+    // Sync status to Supabase delivery_assignments
+    const isCompleted = status.includes('done') || status === 'completed';
+    const supabaseUpdate: Record<string, any> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (isCompleted) {
+      supabaseUpdate.completed_at = new Date().toISOString();
     }
 
-    const api = createWooCommerceAPI(finalStoreId);
-    const order = await api.updateOrderStatus(order_id, status);
+    await supabase
+      .from('delivery_assignments')
+      .update(supabaseUpdate)
+      .eq('order_id', order_id)
+      .eq('store_id', store_id);
+
+    // Log activity
+    await logActivity({
+      driverId: user.user_id,
+      driverName: user.username,
+      action: 'status_change',
+      orderId: order_id,
+      storeId: store_id,
+      details: { from_status: body.previous_status, to_status: status },
+    });
 
     return NextResponse.json({
       success: true,

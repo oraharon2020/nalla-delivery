@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateToken } from '@/lib/auth';
-import { config } from '@/lib/config';
+import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activity-log';
+import bcrypt from 'bcryptjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,86 +13,84 @@ export async function POST(request: NextRequest) {
 
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, message: 'שם משתמש וסיסמה הם שדות חובה' },
+        { success: false, message: 'אימייל וסיסמה הם שדות חובה' },
         { status: 400 }
       );
     }
 
-    // Try to authenticate via WordPress REST API
-    // Using driver.nalla.co.il WordPress with JWT plugin
-    const wpUrl = 'https://driver.nalla.co.il';
-    
-    // WordPress JWT Authentication
-    const authResponse = await fetch(`${wpUrl}/wp-json/jwt-auth/v1/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: username.trim(),
-        password: password.trim(),
-      }),
-    });
+    const identifier = username.trim();
 
-    if (authResponse.ok) {
-      const wpData = await authResponse.json();
-      
-      // Extract user_id from the WordPress JWT token
-      let userId = 1;
-      if (wpData.token) {
-        try {
-          const tokenParts = wpData.token.split('.');
-          if (tokenParts.length === 3) {
-            const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
-            userId = payload.data?.user?.id ? parseInt(payload.data.user.id) : 1;
-          }
-        } catch (e) {
-          console.error('Error parsing WP token:', e);
-        }
+    // Try to find driver by email first, then by display_name
+    let user = null;
+
+    const { data: byEmail } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', identifier)
+      .eq('role', 'driver')
+      .single();
+
+    if (byEmail) {
+      user = byEmail;
+    } else {
+      // Try by display_name (case-insensitive)
+      const { data: byName } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('display_name', identifier)
+        .eq('role', 'driver')
+        .single();
+
+      if (byName) {
+        user = byName;
       }
-      
-      // Generate our own JWT token
-      const token = generateToken({
-        user_id: userId,
-        username: wpData.user_nicename || username,
-      });
-
-      return NextResponse.json({
-        success: true,
-        token,
-        username: wpData.user_nicename || username,
-      });
     }
 
-    // If JWT plugin not installed, try basic auth validation
-    const basicAuthResponse = await fetch(`${wpUrl}/wp-json/wp/v2/users/me`, {
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${username.trim()}:${password.trim()}`).toString('base64'),
-      },
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'משתמש לא נמצא' },
+        { status: 401 }
+      );
+    }
+
+    if (!user.is_active) {
+      return NextResponse.json(
+        { success: false, message: 'החשבון אינו פעיל' },
+        { status: 403 }
+      );
+    }
+
+    // Verify password with bcrypt
+    const isValidPassword = await bcrypt.compare(password.trim(), user.password_hash);
+
+    if (!isValidPassword) {
+      return NextResponse.json(
+        { success: false, message: 'סיסמה שגויה' },
+        { status: 401 }
+      );
+    }
+
+    // Generate JWT token with Supabase user ID
+    const token = generateToken({
+      user_id: user.id,
+      username: user.display_name,
     });
 
-    if (basicAuthResponse.ok) {
-      const userData = await basicAuthResponse.json();
-      
-      const token = generateToken({
-        user_id: userData.id,
-        username: userData.slug || username,
-      });
+    // Log login activity
+    await logActivity({
+      driverId: user.id,
+      driverName: user.display_name,
+      action: 'login',
+    });
 
-      return NextResponse.json({
-        success: true,
-        token,
-        username: userData.slug || username,
-      });
-    }
-
-    return NextResponse.json(
-      { success: false, message: 'שם משתמש או סיסמה שגויים' },
-      { status: 401 }
-    );
+    return NextResponse.json({
+      success: true,
+      token,
+      username: user.display_name,
+    });
   } catch (error: unknown) {
     console.error('Auth error:', error);
-    
+
     return NextResponse.json(
       { success: false, message: 'שגיאה בהתחברות' },
       { status: 500 }

@@ -11,10 +11,10 @@ import {
   formatDate,
   getCurrentUsername,
   isAuthenticated,
-  detectStoreFromOrderId,
   getStatusLabel,
 } from '@/utils/helpers';
 import type { WCOrder, AllowedStatuses, UploadedFile } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 export default function OrderDetailsPage() {
   return (
@@ -33,7 +33,7 @@ function OrderDetailsContent() {
   const storeIdParam = searchParams.get('store');
 
   const [order, setOrder] = useState<WCOrder | null>(null);
-  const [storeId, setStoreId] = useState<'1' | '2'>('1');
+  const [storeId, setStoreId] = useState(storeIdParam || '');
   const [allowedStatuses, setAllowedStatuses] = useState<AllowedStatuses>({});
   const [commentText, setCommentText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<Map<string, File>>(new Map());
@@ -52,30 +52,24 @@ function OrderDetailsContent() {
       return;
     }
 
-    // Determine store ID
-    let finalStoreId: '1' | '2' = '1';
-    if (storeIdParam) {
-      if (storeIdParam.startsWith('5')) {
-        finalStoreId = '1';
-      } else if (storeIdParam.startsWith('4')) {
-        finalStoreId = '2';
-      } else if (['1', '2'].includes(storeIdParam)) {
-        finalStoreId = storeIdParam as '1' | '2';
-      }
-    } else {
-      finalStoreId = detectStoreFromOrderId(orderId);
+    if (!storeIdParam) {
+      setError('מזהה חנות חסר');
+      return;
     }
-    setStoreId(finalStoreId);
 
-    loadAllowedStatuses(finalStoreId);
-    loadOrderDetails(orderId, finalStoreId);
+    setStoreId(storeIdParam);
+
+    loadAllowedStatuses(storeIdParam);
+    loadOrderDetails(orderId, storeIdParam);
   }, [orderId, storeIdParam, router, isClient]);
 
-  const loadAllowedStatuses = async (store: '1' | '2') => {
+  const loadAllowedStatuses = async (store: string) => {
     try {
       const response = await getAllStatuses();
       if (response.success) {
-        const storeStatuses = store === '2' ? response.nalla : response.bellano;
+        // Map store_id to the correct statuses list
+        const isNalla = store === '2' || store.toLowerCase() === 'nalla';
+        const storeStatuses = isNalla ? response.nalla : response.bellano;
         const statuses: AllowedStatuses = {};
         storeStatuses.forEach((status) => {
           statuses[status] = {
@@ -96,7 +90,7 @@ function OrderDetailsContent() {
     }
   };
 
-  const loadOrderDetails = async (id: string, store: '1' | '2') => {
+  const loadOrderDetails = async (id: string, store: string) => {
     try {
       showLoader('טוען פרטי הזמנה...');
       setError('');
@@ -307,6 +301,35 @@ function OrderDetailsContent() {
       const response = await addOrderNote(orderId, storeId, finalNoteText, false);
 
       if (response.success) {
+        // If files were uploaded, also attach them to signed_documents if one exists
+        if (uploadedFiles.length > 0) {
+          const imageUrls = uploadedFiles
+            .filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name))
+            .map(f => f.url);
+
+          if (imageUrls.length > 0) {
+            try {
+              const { data: existingDoc } = await supabase
+                .from('signed_documents')
+                .select('id, photos')
+                .eq('order_id', parseInt(orderId))
+                .order('signed_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (existingDoc) {
+                const currentPhotos = existingDoc.photos || [];
+                await supabase
+                  .from('signed_documents')
+                  .update({ photos: [...currentPhotos, ...imageUrls] })
+                  .eq('id', existingDoc.id);
+              }
+            } catch (e) {
+              console.error('Error attaching photos to signed document:', e);
+            }
+          }
+        }
+
         setCommentText('');
         setSelectedFiles(new Map());
         await loadOrderDetails(orderId, storeId);
